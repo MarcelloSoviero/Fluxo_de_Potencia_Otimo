@@ -1,0 +1,4 @@
+Conexao,Impedancia,Shunt,Tap,Defasagem,Fluxo Maximo
+0-1, 1+1j, 10j, 1, 0, 1000
+1-2, 2+0.5j, 10j, 1, 0, 1000
+0-2, 1+5j, 10j, 1, 0, 1000
