@@ -57,19 +57,29 @@ class Mundo:
                                            float(infos_barra["V"]),float(infos_barra["Theta"]), 0, 0))
 
 
+    def Pkm(self, barra_k, barra_m):
+        k = barra_k.indice
+        m = barra_m.indice
+        return (self.G[k][m]*cos(barra_k.theta-barra_m.theta) + self.B[k][m]*sin(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+    
+    def Qkm(self, barra_k, barra_m):
+        k = barra_k.indice
+        m = barra_m.indice
+        return (self.G[k][m]*sin(barra_k.theta-barra_m.theta) - self.B[k][m]*cos(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+
+
     def P_e_Q(self):
-        Pks = []
-        Qks = []
         tol = 0.003
         repetir = False
-        for k, barra_k in enumerate(self.barras):
+        for barra_k in self.barras:
             if barra_k.tipo_barra == "PQ":
                 #Pk = Vk*(Vm*(Gkm*cos(theta_km) + Bkm*sin(theta_km)))  para todo m pertencente às barras (incluindo k)
                 Pk_temp = 0
                 Qk_temp = 0
-                for m, barra_m in enumerate(self.barras):
-                    Pk_temp += (self.G[k][m]*cos(barra_k.theta-barra_m.theta) + self.B[k][m]*sin(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
-                    Qk_temp += (self.G[k][m]*sin(barra_k.theta-barra_m.theta) - self.B[k][m]*cos(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+                for barra_m in self.barras:
+                    Pk_temp += self.Pkm(barra_k, barra_m)
+                    Qk_temp += self.Qkm(barra_k, barra_m)
+
                 barra_k.P_calculado = Pk_temp
                 barra_k.Q_calculado = Qk_temp
                 barra_k.delta_P = barra_k.P - Pk_temp
@@ -79,9 +89,11 @@ class Mundo:
             
             elif barra_k.tipo_barra == "PV":
                 Pk_temp = 0
-                for m, barra_m in enumerate(self.barras):
-                    Pk_temp += (self.G[k][m]*cos(barra_k.theta-barra_m.theta) + self.B[k][m]*sin(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
-                    Qk_temp += (self.G[k][m]*sin(barra_k.theta-barra_m.theta) - self.B[k][m]*cos(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+                Qk_temp = 0
+                for barra_m in self.barras:
+                    Pk_temp += self.Pkm(barra_k, barra_m)
+                    Qk_temp += self.Qkm(barra_k, barra_m)
+
                 barra_k.P_calculado = Pk_temp
                 barra_k.Q_calculado = Qk_temp
                 barra_k.delta_P = barra_k.P - Pk_temp
@@ -92,10 +104,81 @@ class Mundo:
                 pass
         
 
+    def criar_jacobiano_base(self):
+        linha = [0]*len(self.barras)*2
+        jacobiano = []
+        for barra in self.barras:
+            jacobiano.append(linha[:])
+            jacobiano.append(linha[:])
+
+        self.jacobiano_base = jacobiano
+
+
+    def Hkm(self, barra_k, barra_m):
+        k = barra_k.indice
+        m = barra_m.indice
+        if barra_k.tipo_barra != "VT" and barra_m.tipo_barra != "VT":
+            if k != m:
+                return (self.G[k][m]*sin(barra_k.theta-barra_m.theta) - self.B[k][m]*cos(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+
+            elif k == m:
+                print(barra_k)
+                return -barra_m.V*barra_k.V*self.B[k][m] - barra_k.Q_calculado
+            
+        else:
+            return 0
+        
+    def Nkm(self, barra_k, barra_m):
+        k = barra_k.indice
+        m = barra_m.indice
+        if barra_k.tipo_barra != "VT" and barra_m.tipo_barra != "VT" and barra_m.tipo_barra != "PV":
+            if k != m:
+                return (self.G[k][m]*cos(barra_k.theta-barra_m.theta) + self.B[k][m]*sin(barra_k.theta-barra_m.theta))*barra_k.V
+
+            elif k == m:
+                return barra_k.V*self.G[k][m] + barra_k.P_calculado
+            
+        else:
+            return 0
+        
+    def Lkm(self, barra_k, barra_m):
+        k = barra_k.indice
+        m = barra_m.indice
+        if barra_k.tipo_barra != "VT" and barra_k.tipo_barra != "PV" and barra_m.tipo_barra != "VT" and barra_m.tipo_barra != "PV":
+            if k != m:
+                return (self.G[k][m]*sin(barra_k.theta-barra_m.theta) - self.B[k][m]*cos(barra_k.theta-barra_m.theta))*barra_k.V
+
+            elif k == m:
+                return -barra_k.V*self.B[k][m] + barra_k.Q_calculado
+            
+        else:
+            return 0
+
+    def popular_jacobiano(self):
+        bus = len(self.barras)
+        for barra_k in self.barras:
+            for barra_m in self.barras:
+                h = self.Hkm(barra_k,barra_m)
+                n = self.Nkm(barra_k,barra_m)
+                l = self.Lkm(barra_k,barra_m)
+                k = barra_k.indice
+                m = barra_m.indice
+
+                self.jacobiano_base[k][m] = h
+                self.jacobiano_base[k][m + bus] = n
+                self.jacobiano_base[k + bus][m] = n
+                self.jacobiano_base[k + bus][m + bus] = l
+
+        print(self.jacobiano_base)
+                
+
+
 
 
 mu = Mundo()
 mu.gerar_Ybarra()
 mu.gerar_B_e_G()
 mu.ler_tab_barras()
-mu.P_e_Q_calculado()
+mu.P_e_Q()
+mu.criar_jacobiano_base()
+mu.popular_jacobiano()
