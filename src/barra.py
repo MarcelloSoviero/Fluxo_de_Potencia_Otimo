@@ -1,11 +1,17 @@
 class Barra:
-    def __init__(self, indice, tipo_barra, dado1, dado2, conexoes, shunts):
+    def __init__(self, indice, tipo_barra, P, Q, V, theta, conexoes, shunts):
         self.indice = indice
         self.tipo_barra = tipo_barra
-        self.dado1 = dado1
-        self.dado2 = dado2
+        self.P = P
+        self.Q = Q
+        self.V = V
+        self.theta = theta
         self.conexoes = conexoes
         self.shunts = shunts
+        self.delta_P = None
+        self.delta_Q = None
+        self.P_calculado = None
+        self.Q_calculado = None
 
     def minha_func(self):
         self.indice

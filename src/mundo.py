@@ -1,15 +1,22 @@
 import pandas as pd
+import os
+from math import cos, sin
+import barra
+
+root_dir = os.path.dirname(os.path.abspath(__file__))[:-4]
+path_barras = os.path.join(root_dir, "tabela_barras.csv")
+path_conexoes = os.path.join(root_dir, "tabela_conexoes.csv")
 
 class Mundo:
     def __init__(self):
-        self.tabela_barras = pd.read_csv("tabela_barras.csv")
-        self.tabela_conexoes = pd.read_csv("tabela_conexoes.csv")
+        self.tabela_barras = pd.read_csv(path_barras)
+        self.tabela_conexoes = pd.read_csv(path_conexoes)
         self.ybarra = None
 
     def gerar_Ybarra(self):
-        linha = [0]*len(self.tabela_conexoes)
+        linha = [0]*len(self.tabela_barras)
         ybarra = []
-        for _ in range(len(self.tabela_conexoes)):
+        for _ in range(len(self.tabela_barras)):
             ybarra.append(linha[:])
 
         for n in range(len(self.tabela_conexoes)):
@@ -28,8 +35,8 @@ class Mundo:
     def gerar_B_e_G(self):
         B = []
         G = []
-        linha = [0]*len(self.tabela_conexoes)
-        for _ in range(len(self.tabela_conexoes)):
+        linha = [0]*len(self.tabela_barras)
+        for _ in range(len(self.tabela_barras)):
             B.append(linha[:])
             G.append(linha[:])
 
@@ -38,13 +45,57 @@ class Mundo:
                 B[il][ic] = coluna.imag
                 G[il][ic] = coluna.real
 
-        for linha in B:
-            print(linha)
-        for linha in G:
-            print(linha)
+        self.G = G
+        self.B = B
+
+
+    def ler_tab_barras(self):
+        self.barras = []
+        for n in range(len(self.tabela_barras)):
+            infos_barra = self.tabela_barras.iloc[n]
+            self.barras.append(barra.Barra(int(infos_barra["Indice"]),infos_barra["Tipo"],float(infos_barra["P"]),float(infos_barra["Q"]),
+                                           float(infos_barra["V"]),float(infos_barra["Theta"]), 0, 0))
+
+
+    def P_e_Q(self):
+        Pks = []
+        Qks = []
+        tol = 0.003
+        repetir = False
+        for k, barra_k in enumerate(self.barras):
+            if barra_k.tipo_barra == "PQ":
+                #Pk = Vk*(Vm*(Gkm*cos(theta_km) + Bkm*sin(theta_km)))  para todo m pertencente às barras (incluindo k)
+                Pk_temp = 0
+                Qk_temp = 0
+                for m, barra_m in enumerate(self.barras):
+                    Pk_temp += (self.G[k][m]*cos(barra_k.theta-barra_m.theta) + self.B[k][m]*sin(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+                    Qk_temp += (self.G[k][m]*sin(barra_k.theta-barra_m.theta) - self.B[k][m]*cos(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+                barra_k.P_calculado = Pk_temp
+                barra_k.Q_calculado = Qk_temp
+                barra_k.delta_P = barra_k.P - Pk_temp
+                barra_k.delta_Q = barra_k.Q - Qk_temp
+                if not repetir and (abs(barra_k.delta_P) > tol or abs(barra_k.delta_Q) > tol):
+                    repetir = True
+            
+            elif barra_k.tipo_barra == "PV":
+                Pk_temp = 0
+                for m, barra_m in enumerate(self.barras):
+                    Pk_temp += (self.G[k][m]*cos(barra_k.theta-barra_m.theta) + self.B[k][m]*sin(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+                    Qk_temp += (self.G[k][m]*sin(barra_k.theta-barra_m.theta) - self.B[k][m]*cos(barra_k.theta-barra_m.theta))*barra_m.V*barra_k.V
+                barra_k.P_calculado = Pk_temp
+                barra_k.Q_calculado = Qk_temp
+                barra_k.delta_P = barra_k.P - Pk_temp
+                if not repetir and abs(barra_k.delta_P) > tol:
+                    repetir = True
+
+            else:
+                pass
+        
 
 
 
 mu = Mundo()
 mu.gerar_Ybarra()
 mu.gerar_B_e_G()
+mu.ler_tab_barras()
+mu.P_e_Q_calculado()
